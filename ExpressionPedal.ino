@@ -43,19 +43,30 @@ Credits:
 MPU6050 mpu(Wire);
 DigiPot pot(5,6,7);
 
+bool debugMode = true;
+bool invertedExpression = false;
+
 const int resetSwitch = 8;
 int resetSwitchState = 0;
 bool resetSwitchPressed = false;
-bool debugMode = true;
+
 float minAngle = 180;
 float maxAngle = -180;
-float currentAngle = 0;
-int potPerc = 0;
-unsigned long timer = 0;
-unsigned long timerLimit = 3000;
+float currentAngle0 = 0;
+float currentAngle1 = 0;
+float currentAngle2 = 0;
+float currentAngle3 = 0;
+float currentAngle4 = 0;
+float currentAngle5 = 0;
+float currentAngleAvg = 0;
 float angX;
 float angY;
 float angZ;
+
+int potPerc = 0;
+
+unsigned long timer = 0;
+unsigned long timerLimit = 50;
 
 void setup()
 {
@@ -79,36 +90,42 @@ void loop()
   angX = mpu.getAngleX();
   angY = mpu.getAngleY();
   angZ = mpu.getAngleZ();
-  currentAngle = angX;      //change this if need to use different axis
+  
+  currentAngle5 = currentAngle4;
+  currentAngle4 = currentAngle3;
+  currentAngle3 = currentAngle2;
+  currentAngle2 = currentAngle1;
+  currentAngle1 = currentAngle0;
+  currentAngle0 = angZ;      //change this if need to use different axis
+  currentAngleAvg = ( currentAngle0 + currentAngle1 + currentAngle2 + currentAngle3 + currentAngle4 + currentAngle5 ) / 5;
 
-  if (currentAngle > maxAngle)
+  if (currentAngleAvg > maxAngle)
   {
-    maxAngle = currentAngle;     // if current angle exceed the previous max, then set max to current
+    maxAngle = currentAngleAvg;     // if current angle exceed the previous max, then set max to current
   }
-  if (currentAngle < minAngle)
+  if (currentAngleAvg < minAngle)
   {
-    minAngle = currentAngle;     // if current angle lower than the previous min, then set min to current
+    minAngle = currentAngleAvg;     // if current angle lower than the previous min, then set min to current
   }
 
-  float currentOffset = currentAngle - minAngle;
+  float currentOffset = currentAngleAvg - minAngle;
   float angleRange = maxAngle-minAngle;
   potPerc = currentOffset * 100 / angleRange;
+  if (invertedExpression)
+  {
+    potPerc = 100 - potPerc;
+  }
   pot.set(potPerc);      // Set the pot to the current angle as a percentage of the difference between min and max
-
-
 
   if (debugMode)
   {
     if (millis()-timer > timerLimit)
     {
       timer = millis();
-      Serial.print("angX: ");
-      Serial.println(angX);
-      Serial.print("angY: ");
-      Serial.println(angY);
-      Serial.print("angZ: ");
-      Serial.println(angZ);
-      Serial.println(" ");
+      Serial.print("currentAngleAvg:");
+      Serial.print(currentAngleAvg);
+      Serial.print(",potPerc:");
+      Serial.println(potPerc);
     }
   }
 
@@ -127,7 +144,7 @@ void loop()
     }
     minAngle = 180;
     maxAngle = -180;
-    currentAngle = 0;
+    currentAngle0 = 0;
     potPerc = 0;
     mpu.calcOffsets(); // gyro and accelero offset calculation
   }
