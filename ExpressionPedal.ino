@@ -32,41 +32,38 @@ Credits:
   https://electropeak.com/learn/interfacing-x9c103s-10k-digital-potentiometer-module-with-arduino/
   https://randomnerdtutorials.com/arduino-mpu-6050-accelerometer-gyroscope/
   https://arduino.stackexchange.com/a/50225
+  https://maker.pro/arduino/tutorial/how-to-clean-up-noisy-sensor-data-with-a-moving-average-filter for the moving average filter code
 */
-
 
 // Includes, constants and global variables
 #include "Wire.h"
 #include <MPU6050_light.h>
 #include <DigiPotX9Cxxx.h>
 
+// Devices
 MPU6050 mpu(Wire);
 DigiPot pot(5,6,7);
 
-bool debugMode = true;
-bool invertedExpression = false;
-
+// Constants
+const bool debugMode = true;
+const bool invertedExpression = false;
 const int resetSwitch = 8;
+const int index = 5;
+
+// Global Variables
+String plotValue;
 int resetSwitchState = 0;
 bool resetSwitchPressed = false;
-
 float minAngle = 180;
 float maxAngle = -180;
-float currentAngle0 = 0;
-float currentAngle1 = 0;
-float currentAngle2 = 0;
-float currentAngle3 = 0;
-float currentAngle4 = 0;
-float currentAngle5 = 0;
+float currentAngle[index];
 float currentAngleAvg = 0;
 float angX;
 float angY;
 float angZ;
-
 int potPerc = 0;
-
 unsigned long timer = 0;
-unsigned long timerLimit = 50;
+unsigned long timerLimit = 100;
 
 void setup()
 {
@@ -75,29 +72,34 @@ void setup()
     Serial.begin(115200);
     Serial.println("Serial monitor started");
   }  
-  pot.set(0);
-  Wire.begin();
-  pinMode(resetSwitch,INPUT_PULLUP);
-  byte status = mpu.begin();
+  pot.set(0);     // Initialize digital potentiometer
+  Wire.begin();     // start comms with the accelerometer/gyroscope
+  pinMode(resetSwitch,INPUT_PULLUP);      // initialise the reset switch
+  byte status = mpu.begin();      // initialize the accelerometer/gyroscope
   while(status!=0){ } // stop everything if could not connect to MPU6050
   // mpu.upsideDownMounting = true; // uncomment this line if the MPU6050 is mounted upside-down
-  mpu.calcOffsets(); // gyro and accelero offset calculation
+  mpu.calcOffsets();      // gyro and accelero offset calculation
+  currentAngle[1] = 0;
+  currentAngle[2] = 0;
+  currentAngle[3] = 0;
+  currentAngle[4] = 0;
+  currentAngle[5] = 0;
 }
 
 void loop()
 {
   mpu.update();     // read MPU6050
   angX = mpu.getAngleX();
-  angY = mpu.getAngleY();
-  angZ = mpu.getAngleZ();
+  //angY = mpu.getAngleY();     //change this if need to use different axis
+  //angZ = mpu.getAngleZ();     //change this if need to use different axis
   
-  currentAngle5 = currentAngle4;
-  currentAngle4 = currentAngle3;
-  currentAngle3 = currentAngle2;
-  currentAngle2 = currentAngle1;
-  currentAngle1 = currentAngle0;
-  currentAngle0 = angZ;      //change this if need to use different axis
-  currentAngleAvg = ( currentAngle0 + currentAngle1 + currentAngle2 + currentAngle3 + currentAngle4 + currentAngle5 ) / 5;
+  // To reduce noise we calulate the linear weighted average of the last 5 angle readings
+  currentAngle[5] = currentAngle[4];
+  currentAngle[4] = currentAngle[3];
+  currentAngle[3] = currentAngle[2];
+  currentAngle[2] = currentAngle[1];
+  currentAngle[1] = angX;      //change this if need to use different axis
+  currentAngleAvg = ( currentAngle[1] + currentAngle[2] + currentAngle[3] + currentAngle[4] + currentAngle[5]  ) / index;
 
   if (currentAngleAvg > maxAngle)
   {
@@ -108,13 +110,15 @@ void loop()
     minAngle = currentAngleAvg;     // if current angle lower than the previous min, then set min to current
   }
 
-  float currentOffset = currentAngleAvg - minAngle;
-  float angleRange = maxAngle-minAngle;
-  potPerc = currentOffset * 100 / angleRange;
-  if (invertedExpression)
+  float currentOffset = currentAngleAvg - minAngle;     // calculate how far (in degress) we are above the minimum
+  float angleRange = maxAngle-minAngle;                 // calculate the breadth of the range between min and max
+  potPerc = currentOffset * 100 / angleRange;           // the value to set the pot is the %age of the current angle vs the full range 
+
+  if (invertedExpression)     // switch between heel down being min or max
   {
     potPerc = 100 - potPerc;
   }
+
   pot.set(potPerc);      // Set the pot to the current angle as a percentage of the difference between min and max
 
   if (debugMode)
@@ -122,8 +126,16 @@ void loop()
     if (millis()-timer > timerLimit)
     {
       timer = millis();
-      Serial.print("currentAngleAvg:");
-      Serial.print(currentAngleAvg);
+      Serial.print("currentAngle[1]:");
+      Serial.print(currentAngle[1]);
+      Serial.print(",currentAngle[2]:");
+      Serial.print(currentAngle[2]);
+      Serial.print(",currentAngle[3]:");
+      Serial.print(currentAngle[3]);
+      Serial.print(",currentAngle[4]:");
+      Serial.print(currentAngle[4]);
+      Serial.print(",currentAngle[5]:");
+      Serial.print(currentAngle[5]);
       Serial.print(",potPerc:");
       Serial.println(potPerc);
     }
@@ -144,9 +156,8 @@ void loop()
     }
     minAngle = 180;
     maxAngle = -180;
-    currentAngle0 = 0;
+    currentAngle[1] = 0;
     potPerc = 0;
     mpu.calcOffsets(); // gyro and accelero offset calculation
   }
-
 }
