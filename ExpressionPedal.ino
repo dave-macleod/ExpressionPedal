@@ -8,9 +8,7 @@ Purpose
   
   This acts as an expression pedal for controlling guitar signals with pedals or devices that accept an expression pedal input.
   In my case I am controlling an Electro Harmonix (EHX) Worm.
-
 Physical connections  
-
   MPU6050 connections
     GND to GND
     VCC to VCC
@@ -23,7 +21,6 @@ Physical connections
     INC to pin 5
     U/D to pin 6
     CS to pin 7
-
 Author
   Dave MacLeod damacleod@gmail.com
 Date
@@ -54,8 +51,8 @@ const int index = 5;
 String plotValue;
 int resetSwitchState = 0;
 bool resetSwitchPressed = false;
-float minAngle = 180;
-float maxAngle = -180;
+float minAngle = 0;
+float maxAngle = 18;
 float currentAngle[index];
 float currentAngleAvg = 0;
 float angX;
@@ -79,6 +76,7 @@ void setup()
   while(status!=0){ } // stop everything if could not connect to MPU6050
   // mpu.upsideDownMounting = true; // uncomment this line if the MPU6050 is mounted upside-down
   mpu.calcOffsets();      // gyro and accelero offset calculation
+  delay(1000);
   currentAngle[1] = 0;
   currentAngle[2] = 0;
   currentAngle[3] = 0;
@@ -101,18 +99,27 @@ void loop()
   currentAngle[1] = angX;      //change this if need to use different axis
   currentAngleAvg = ( currentAngle[1] + currentAngle[2] + currentAngle[3] + currentAngle[4] + currentAngle[5]  ) / index;
 
-  if (currentAngleAvg > maxAngle)
-  {
-    maxAngle = currentAngleAvg;     // if current angle exceed the previous max, then set max to current
-  }
-  if (currentAngleAvg < minAngle)
-  {
-    minAngle = currentAngleAvg;     // if current angle lower than the previous min, then set min to current
-  }
+//  if (currentAngleAvg > maxAngle)
+//  {
+//    maxAngle = currentAngleAvg;     // if current angle exceed the previous max, then set max to current
+//  }
+//  if (currentAngleAvg < minAngle)
+//  {
+//    minAngle = currentAngleAvg;     // if current angle lower than the previous min, then set min to current
+//  }
 
   float currentOffset = currentAngleAvg - minAngle;     // calculate how far (in degress) we are above the minimum
   float angleRange = maxAngle-minAngle;                 // calculate the breadth of the range between min and max
   potPerc = currentOffset * 100 / angleRange;           // the value to set the pot is the %age of the current angle vs the full range 
+  if (potPerc < 0)
+  {
+    potPerc = 0;
+  }
+  
+  if (potPerc > 100)
+  {
+    potPerc = 100;
+  }
 
   if (invertedExpression)     // switch between heel down being min or max
   {
@@ -154,8 +161,8 @@ void loop()
     {
       Serial.println("Reset");
     }
-    minAngle = 180;
-    maxAngle = -180;
+//    minAngle = 180;
+//    maxAngle = -180;
     currentAngle[1] = 0;
     potPerc = 0;
     mpu.calcOffsets(); // gyro and accelero offset calculation
